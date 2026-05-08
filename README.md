@@ -1,0 +1,278 @@
+# AR 스마트 부동산 분석 플랫폼
+
+> 컨퍼런스 프로젝트 (6인 팀)
+> 주제: 카메라 기반 AR 부동산 분석 서비스 (멀티모달: Vision + Sensor + Tabular)
+
+## 내 역할: 데이터 수집 가능성 조사
+
+사용자가 건물을 카메라로 촬영하면 센서(GPS+IMU) + 비전(OCR) + 공공데이터(시세/법적정보/ESG)를 결합해 정보를 AR로 보여주는 서비스.
+
+**이 조사의 목적**: 각 API가 실제로 동작하는지, 데이터가 서로 연결 가능한지 확인.
+
+---
+
+## 프로젝트 구조
+
+```
+TB_multimodal/
+├── README.md                          ← 이 문서 (조사 결과 + 연계 가능성 + 제한사항)
+├── .env.example                       ← API 키 템플릿
+├── .env                               ← 실제 API 키 (git 제외)
+├── api_test/                          ← API별 테스트 스크립트
+│   ├── config.py                      ← 공통 설정, PNU 파서, 유틸리티
+│   ├── test_vworld.py                 ← Step 1: Vworld GIS건물통합정보
+│   ├── test_realtrade.py              ← Step 2: 국토교통부 실거래가
+│   ├── test_building_registry.py      ← Step 3: 건축물대장
+│   ├── test_energy.py                 ← Step 4: 건물에너지사용량
+│   ├── test_kakao.py                  ← Step 5: 카카오맵
+│   ├── test_ocr.py                    ← Step 6: Google Vision OCR
+│   └── test_pipeline.py              ← Step 7: 풀 파이프라인 통합 테스트
+└── data_samples/                      ← 각 API 샘플 응답 JSON
+```
+
+---
+
+## 실행 방법
+
+```bash
+# 1. API 키 설정
+cp .env.example .env
+# .env 파일에 실제 키 입력
+
+# 2. 개별 API 테스트
+cd api_test
+python test_vworld.py           # Vworld 건물 폴리곤
+python test_realtrade.py        # 실거래가
+python test_building_registry.py # 건축물대장
+python test_energy.py           # 에너지사용량
+python test_kakao.py            # 카카오맵
+python test_ocr.py              # OCR
+
+# 3. 풀 파이프라인 테스트
+python test_pipeline.py
+
+# 결과는 data_samples/ 폴더에 JSON으로 저장
+```
+
+---
+
+## 조사 플랜 & 체크리스트
+
+### Step 1: Vworld GIS건물통합정보 API (최우선)
+
+| 항목 | 상태 |
+|------|:----:|
+| API 키 발급 (무료, vworld.kr) | ⬜ |
+| GeoJSON 형태로 폴리곤 좌표 반환 | ⬜ |
+| BD_MGT_SN (25자리 건물관리번호) 포함 | ⬜ |
+| PNU (19자리 필지고유번호) 포함 | ⬜ |
+| 반경 기반 검색 (geomFilter + buffer) | ⬜ |
+| 일일 호출 제한 확인 | ⬜ |
+
+- **엔드포인트**: `http://api.vworld.kr/req/data`
+- **레이어 후보**: LT_C_AISRESC, LT_C_SPBD, LT_C_UISRESC
+- **리스크**: 3D 데이터 API는 2019년 폐쇄됨. 2D만 사용 가능.
+
+### Step 2: 국토교통부 실거래가 API
+
+| 항목 | 상태 |
+|------|:----:|
+| API 키 발급 + 승인 (data.go.kr, 1~2시간) | ⬜ |
+| XML/JSON 응답 정상 확인 | ⬜ |
+| 거래금액, 전용면적, 아파트명, 층, 건축년도 필드 | ⬜ |
+| BD_MGT_SN **미포함** 확인 | ⬜ |
+| 일일 1,000회 제한 확인 | ⬜ |
+
+- **엔드포인트**: `http://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev`
+- **연계**: PNU → 시군구코드(5자리) + 법정동코드(5자리) + 지번 → 실거래가 조회
+
+### Step 3: 건축물대장 API
+
+| 항목 | 상태 |
+|------|:----:|
+| mgmBldrgstPk (건축물대장 PK) 확인 | ⬜ |
+| BD_MGT_SN **미포함** 확인 | ⬜ |
+| 위반건축물 이력 조회 가능 여부 | ⬜ |
+| 아파트(집합건물) 1필지 다동 → 1:N 매칭 문제 | ⬜ |
+| 일일 1,000회 제한 확인 | ⬜ |
+
+- **엔드포인트**: `http://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo`
+- **핵심 리스크**: 건축물대장 PK(mgmBldrgstPk) ≠ BD_MGT_SN. 아파트는 PNU만으로 특정 동 식별 불가 → 동 이름 텍스트 매칭 필요 (~90% 매칭률)
+
+### Step 4: 건물에너지사용량 API
+
+| 항목 | 상태 |
+|------|:----:|
+| 에너지 사용량 (kWh) 반환 확인 | ⬜ |
+| BD_MGT_SN **미포함** 확인 | ⬜ |
+| 데이터 갱신 주기 (월별 집계) | ⬜ |
+| 커버리지 (소규모 건물 데이터 유무) | ⬜ |
+
+- **엔드포인트**: `http://apis.data.go.kr/1611000/BldEngyService/getBldEngyInfo`
+- **ESG 활용**: 전기 사용량 × 탄소배출계수(0.4747 tCO2/MWh) → 간접 탄소 배출량
+
+### Step 5: 카카오맵 API
+
+| 항목 | 상태 |
+|------|:----:|
+| KakaoAK 인증 동작 | ⬜ |
+| 좌표 → 도로명주소/지번주소 반환 | ⬜ |
+| 무료 쿼터 30만건/일 (테스트 앱 100건/일) | ⬜ |
+
+- **엔드포인트**: `https://dapi.kakao.com/v2/local/`
+- **역할**: 좌표↔주소 변환, POI 검색 (보조)
+
+### Step 6: Google Cloud Vision API (OCR)
+
+| 항목 | 상태 |
+|------|:----:|
+| 무료 1,000건/월 확인 | ⬜ |
+| 한국어 간판 인식률 확인 | ⬜ |
+| base64 이미지 → TEXT_DETECTION 동작 | ⬜ |
+
+- **엔드포인트**: `https://vision.googleapis.com/v1/images:annotate`
+- **역할**: 건물 간판 텍스트 인식 → 레이캐스팅 결과 교차 검증
+
+### Step 7: 데이터 연계 종합 검증
+
+| 항목 | 상태 |
+|------|:----:|
+| PNU 파싱 로직 (시군구코드/법정동코드/번/지) | ⬜ |
+| 단독건물 풀 파이프라인 테스트 | ⬜ |
+| 아파트(집합건물) 풀 파이프라인 테스트 | ⬜ |
+| 매칭 실패 케이스 기록 | ⬜ |
+
+---
+
+## 핵심 발견: 데이터 연계 구조
+
+### BD_MGT_SN은 만능 공통키가 아니다
+
+초기 가설 (BD_MGT_SN으로 모든 API 연결) 은 **틀렸다**.
+
+실제 연계는 **PNU(필지고유번호)** 를 분해하여 각 API에 맞는 파라미터로 변환:
+
+```
+Vworld GIS건물통합정보 (BD_MGT_SN + PNU + 폴리곤)
+       │
+       ├── PNU (19자리) 분해
+       │   ├── 시도코드 (2자리)
+       │   ├── 시군구코드 (3자리)  ──→ sigungu_cd (5자리 = 시도+시군구)
+       │   ├── 읍면동코드 (3자리)
+       │   ├── 리코드 (2자리)     ──→ bjdong_cd (5자리 = 읍면동+리)
+       │   ├── 토지구분 (1자리)
+       │   ├── 본번 (4자리)       ──→ bun
+       │   └── 부번 (4자리)       ──→ ji
+       │
+       ├──→ 실거래가 API     : LAWD_CD (시군구 5자리) + DEAL_YMD + 지번 매칭
+       ├──→ 건축물대장 API   : sigunguCd + bjdongCd + bun + ji
+       └──→ 건물에너지 API   : sigunguCd + bjdongCd + bun + ji
+
+       └── BD_MGT_SN → 도로명주소 추출 → 카카오맵 보조 검증
+```
+
+### PNU 파싱 로직
+
+```python
+# PNU 19자리 구조:
+# [시도(2)][시군구(3)][읍면동(3)][리(2)][토지구분(1)][본번(4)][부번(4)]
+
+# 예시: 1111010100100010000
+#   시도    = 11       (서울)
+#   시군구   = 110      (종로구)
+#   읍면동   = 101      (청운동)
+#   리      = 00
+#   토지구분 = 1        (대지)
+#   본번    = 0001
+#   부번    = 0000
+
+# → sigungu_cd = "11110" (LAWD_CD로 사용)
+# → bjdong_cd  = "10100"
+# → 지번      = "1"
+```
+
+---
+
+## 아키텍처 요약
+
+```
+[ Phase 1: Input ]  GPS + IMU + 카메라
+       ↓
+[ Phase 2: Processing ]  Vworld 폴리곤 + Ray Casting + OCR 보정
+       ↓
+[ Phase 3: Enrichment ]  실거래가 + 건축물대장 + 에너지통계
+       ↓
+[ Phase 4: Output ]  AR 오버레이 (Data Card UI)
+```
+
+---
+
+## API 상세 정보
+
+### 인증/발급 정리
+
+| API | 발급처 | 인증 방식 | 승인 소요 | 무료 쿼터 |
+|-----|--------|-----------|-----------|-----------|
+| Vworld | vworld.kr | query param `key` | 즉시 | 일일 제한 (마이페이지 확인) |
+| 실거래가 | data.go.kr | query param `serviceKey` | 1~2시간 | 1,000건/일 |
+| 건축물대장 | data.go.kr | query param `serviceKey` | 1~2시간 | 1,000건/일 |
+| 에너지사용량 | data.go.kr | query param `serviceKey` | 1~2시간 | 1,000건/일 |
+| 카카오맵 | developers.kakao.com | header `KakaoAK {KEY}` | 즉시 | 30만건/일 (테스트 100건/일) |
+| Google Vision | console.cloud.google.com | query param `key` | 즉시 | 1,000건/월 |
+
+### 응답 형식
+
+| API | 형식 | 비고 |
+|-----|------|------|
+| Vworld | JSON (GeoJSON) | geometry + properties |
+| 실거래가 | XML | item 단위 |
+| 건축물대장 | XML | item 단위 |
+| 에너지사용량 | XML | item 단위 |
+| 카카오맵 | JSON | documents 배열 |
+| Google Vision | JSON | textAnnotations 배열 |
+
+---
+
+## 리스크 요약
+
+| 리스크 | 심각도 | 대응 |
+|--------|:------:|------|
+| BD_MGT_SN이 공통키로 안 됨 | **중** | PNU 기반 연계 + 주소 텍스트 매칭 병행 |
+| 아파트 1필지 다동 매칭 실패 | **중** | 동 이름 텍스트 비교 (~90% 매칭률) |
+| 건축물대장 PK(mgmBldrgstPk) ≠ BD_MGT_SN | **중** | PNU로 간접 연계, 완벽한 1:1은 포기 |
+| API 일일 1,000회 제한 | 저 | 데모 수준에선 충분, 캐싱 도입 |
+| Vworld 3D API 폐쇄 (2019년~) | 저 | 2D 폴리곤으로 충분 (옥상 윤곽) |
+| 에너지 데이터 커버리지 | 저~중 | 소규모 건물은 데이터 없을 수 있음 |
+| 공간정보보안 규정 | 저 | 영구 저장 시 인가 필요할 수 있음. 데모 수준은 OK |
+
+---
+
+## 팀 보고 요약
+
+### 되는 것
+- Vworld 2D 데이터 API로 건물 폴리곤(GeoJSON) + BD_MGT_SN + PNU 획득
+- PNU를 분해하여 실거래가/건축물대장/에너지 API와 연계 가능
+- 카카오맵으로 좌표↔주소 변환 (보조 검증)
+- Google Vision으로 한국어 간판 OCR 가능
+
+### 안 되는 것
+- BD_MGT_SN만으로 모든 API 1:1 연결 → PNU 기반 우회 필요
+- Vworld 3D API는 폐쇄됨 → 2D 폴리곤만 사용
+- 아파트(집합건물)에서 특정 동 식별 → 동 이름 텍스트 매칭 필요 (완벽하지 않음)
+- 소규모 건물 에너지 데이터 없을 수 있음
+
+### 주의사항
+- 공공데이터포털 API는 XML 응답이 기본 (JSON 변환 로직 필요)
+- 공공데이터포털 API는 승인 후 사용 가능 (1~2시간 소요)
+- API 키는 `.env`에 저장, git에는 올리지 않기
+- Vworld 레이어명이 변경될 수 있으므로 여러 후보 시도 로직 필요
+- 일일 1,000회 제한 → 캐싱 레이어 필수
+
+---
+
+## 메모
+
+- 대상 지역: 서울 특정 구/동으로 한정해서 시작 (예: 마포구, 성동구 등)
+- 데이터 저장 형식: GeoJSON 기반
+- 선행 사례: '부동산GO' (2017, 서비스 종료), 현 프롭테크는 3D 조감도/VR 투어에 집중
+- 레퍼런스: Turf.js (공간 연산), QGIS (GIS 시각화)
