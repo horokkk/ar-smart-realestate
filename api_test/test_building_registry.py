@@ -28,11 +28,11 @@ from config import (
 
 # ─── 엔드포인트 ────────────────────────────────────────────
 # 건축물대장 기본개요 (표제부)
-TITLE_URL = "http://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo"
+TITLE_URL = "https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo"
 # 건축물대장 총괄표제부
-RECAP_URL = "http://apis.data.go.kr/1613000/BldRgstHubService/getBrRecapTitleInfo"
+RECAP_URL = "https://apis.data.go.kr/1613000/BldRgstHubService/getBrRecapTitleInfo"
 # 건축물대장 전유공용면적
-AREA_URL = "http://apis.data.go.kr/1613000/BldRgstHubService/getBrExposPubuseAreaInfo"
+AREA_URL = "https://apis.data.go.kr/1613000/BldRgstHubService/getBrExposPubuseAreaInfo"
 
 
 def _fetch_xml(url: str, params: dict) -> ET.Element | None:

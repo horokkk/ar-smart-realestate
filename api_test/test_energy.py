@@ -26,8 +26,8 @@ from config import (
 
 
 # ─── 엔드포인트 ────────────────────────────────────────────
-# 건물에너지사용량통계 (한국에너지공단)
-ENERGY_URL = "http://apis.data.go.kr/1611000/BldEngyService/getBldEngyInfo"
+# 건축HUB 건물에너지정보 서비스
+ENERGY_URL = "https://apis.data.go.kr/1613000/BldEngyHubService/getBldEngyInfo"
 
 
 def _fetch_xml(url: str, params: dict) -> ET.Element | None:
