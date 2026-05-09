@@ -1,14 +1,14 @@
 # 내일 이어서 할 것 (데이터 수집 조사)
 
-## 1순위: Vworld 건물 폴리곤 확인
+## ~~1순위: Vworld 건물 폴리곤 확인~~ — PASS
 
 - [x] Vworld 인증 문제 해결 — `Referer: http://localhost` 헤더 추가
 - [x] 레이어 수정 — `LT_C_AISRESC`(항공장애물) → `LT_C_SPBD`(도로명주소 건물)
-- [ ] `python test_vworld.py` 재실행
-- [ ] bd_mgt_sn (25자리 건물관리번호) 반환 확인
-- [ ] PNU = bd_mgt_sn[:19] 추출 확인
-- [ ] 건물 폴리곤 (MultiPolygon) 좌표 확인
-- [ ] 건물명(buld_nm), 도로명(rd_nm), 층수(gro_flo_co) 확인
+- [x] `python test_vworld.py` 재실행 → **10건 반환**
+- [x] bd_mgt_sn (25자리) → `1111012000100050004000007`
+- [x] PNU = bd_mgt_sn[:19] → `1111012000100050004`
+- [x] MultiPolygon 좌표 확인
+- [x] 도로명: 새문안로 102-2, 시군구: 종로구
 
 ## 2순위: 건축HUB API 참고문서 확인
 
