@@ -10,23 +10,18 @@
 - [x] MultiPolygon 좌표 확인
 - [x] 도로명: 새문안로 102-2, 시군구: 종로구
 
-## 2순위: 건축HUB API 참고문서 확인
+## ~~2순위: 건축HUB API 참고문서 확인~~ — PASS
 
-### 건축물대장
-- [ ] data.go.kr → 건축HUB_건축물대장정보 서비스 → **참고문서** "OpenAPI활용가이드- 건축HUB 건축물대장 1.0.zip" 다운로드
-- [ ] zip 안의 문서에서 **정확한 오퍼레이션명**과 **파라미터** 확인
-- [ ] `test_building_registry.py`의 `TITLE_URL` 수정
-- [ ] `python test_building_registry.py` 재실행
+### 건축물대장 — PASS
+- [x] 오퍼레이션명 확인: `getBrTitleInfo` (기존과 동일, 문제 아니었음)
+- [x] **실제 원인**: Python urllib의 `Accept-Encoding: identity` 헤더 → 서버가 빈 응답 반환
+- [x] **수정**: `req.add_unredirected_header("Accept-Encoding", "")` 추가
+- [x] `python test_building_registry.py` → **358건 반환 (청운벽산빌리지 등)**
 
-### 건물에너지
-- [ ] data.go.kr → 건축HUB_건물에너지정보 서비스 → **참고문서** "OpenAPI활용가이드- 건축HUB 건물에너지 1.0.hwp" 다운로드
-- [ ] hwp 안에서 **정확한 오퍼레이션명**과 **파라미터** 확인 (현재 `getBldEngyInfo` → 404)
-- [ ] `test_energy.py`의 `ENERGY_URL` 수정
-- [ ] `python test_energy.py` 재실행
-
-### 그래도 안 되면
-- [ ] data.go.kr "오류신고 및 문의"에 문의: "승인 완료됐으나 빈 응답/404 반환"
-- [ ] 전화 문의도 고려 (건축문화경관과 02-2187-4164)
+### 건물에너지 — PASS
+- [x] 오퍼레이션명 확인: `getBeElctyUsgInfo` (전기), `getBeGasUsgInfo` (가스)
+- [x] **실제 원인**: (1) Accept-Encoding 헤더 동일 문제, (2) 필수 파라미터 `platGbCd` 누락, (3) `useYmd` → `useYm` 수정
+- [x] `python test_energy.py` → **전기 57,873 kWh / 가스 477,322 kWh 반환**
 
 ## 3순위: Google Vision OCR
 

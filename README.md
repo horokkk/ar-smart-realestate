@@ -141,29 +141,32 @@ python test_pipeline.py
 | 항목 | 상태 |
 |------|:----:|
 | API 키 발급 + 승인 | **승인 완료** (즉시) |
-| mgmBldrgstPk (건축물대장 PK) 확인 | **대기중** (API 빈 응답) |
-| BD_MGT_SN **미포함** 확인 | ⬜ |
-| 위반건축물 이력 조회 가능 여부 | ⬜ |
-| 아파트(집합건물) 1필지 다동 → 1:N 매칭 문제 | ⬜ |
+| mgmBldrgstPk (건축물대장 PK) 확인 | **PASS** (100212383 등) |
+| BD_MGT_SN **미포함** 확인 | **PASS** (예상대로 미포함) |
+| 위반건축물 이력 조회 가능 여부 | **PASS** (bylotCnt 필드) |
+| 아파트(집합건물) 1필지 다동 → 1:N 매칭 문제 | **PASS** (10개동 확인, 동이름 매칭 필요) |
 | 일일 1,000회 제한 확인 | ⬜ |
 
 - **엔드포인트**: `https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo`
+- **테스트 결과**: 종로구 청운동 1번지 → **358건 반환** (청운벽산빌리지 등 10개동)
 - **핵심 리스크**: 건축물대장 PK(mgmBldrgstPk) ≠ BD_MGT_SN. 아파트는 PNU만으로 특정 동 식별 불가 → 동 이름 텍스트 매칭 필요 (~90% 매칭률)
-- **이슈**: 승인 완료 상태지만 HTTP 200 + 빈 응답 반환. 참고문서(zip) 다운로드하여 정확한 오퍼레이션명/파라미터 확인 필요.
+- **해결된 이슈**: Python urllib의 `Accept-Encoding: identity` 헤더로 인해 data.go.kr 서버가 빈 응답을 반환하는 문제. 헤더 수정으로 해결.
+- **확인된 필드**: `mgmBldrgstPk`, `bldNm`, `mainPurpsCdNm`, `totArea`, `grndFlrCnt`, `ugrndFlrCnt`, `useAprDay`, `bylotCnt`, `dongNm`, `strctCdNm` 등 76개
 
 ### Step 4: 건물에너지사용량 API
 
 | 항목 | 상태 |
 |------|:----:|
 | API 키 발급 + 승인 | **승인 완료** (즉시) |
-| 에너지 사용량 (kWh) 반환 확인 | **대기중** (404 에러) |
-| BD_MGT_SN **미포함** 확인 | ⬜ |
-| 데이터 갱신 주기 (월별 집계) | ⬜ |
-| 커버리지 (소규모 건물 데이터 유무) | ⬜ |
+| 에너지 사용량 (kWh) 반환 확인 | **PASS** (전기 57,873 kWh, 가스 477,322 kWh) |
+| BD_MGT_SN **미포함** 확인 | **PASS** (예상대로 미포함) |
+| 데이터 갱신 주기 (월별 집계) | **PASS** (useYm=YYYYMM 형식) |
+| 커버리지 (소규모 건물 데이터 유무) | **부분** (일부 주소 데이터 없음) |
 
-- **엔드포인트**: `https://apis.data.go.kr/1613000/BldEngyHubService` (오퍼레이션명 확인 필요)
-- **ESG 활용**: 전기 사용량 × 탄소배출계수(0.4747 tCO2/MWh) → 간접 탄소 배출량
-- **이슈**: 승인 완료 상태지만 404 반환. 참고문서(hwp) 다운로드하여 정확한 오퍼레이션명 확인 필요.
+- **엔드포인트**: `https://apis.data.go.kr/1613000/BldEngyHubService/getBeElctyUsgInfo` (전기), `getBeGasUsgInfo` (가스)
+- **필수 파라미터**: `sigunguCd`, `bjdongCd`, `platGbCd`(대지구분, 0=대지), `bun`, `ji`, `useYm`(YYYYMM)
+- **ESG 활용**: 전기 사용량 × 탄소배출계수(0.4747 tCO2/MWh) → 간접 탄소 배출량 (예: 57,873 kWh → 27.47 kg CO₂)
+- **해결된 이슈**: (1) `Accept-Encoding: identity` 헤더 문제 (건축물대장과 동일), (2) 필수 파라미터 `platGbCd` 누락, (3) 파라미터명 `useYmd` → `useYm` 수정
 
 ### Step 5: 카카오맵 API
 
@@ -313,8 +316,8 @@ Vworld LT_C_SPBD (bd_mgt_sn + 폴리곤) → PNU = bd_mgt_sn[:19]
 |-----|:------:|:------:|------|
 | Vworld 건물통합정보 (LT_C_SPBD) | O | **PASS** | 10건 반환, bd_mgt_sn/PNU/폴리곤 확인 |
 | 실거래가 (매매 상세) | O | **PASS** | 종로구 26건 정상 반환 |
-| 건축물대장 (건축HUB) | O | **대기중** | 승인됐으나 빈 응답 — 참고문서 확인 필요 |
-| 에너지 (건축HUB) | O | **대기중** | 승인됐으나 404 — 오퍼레이션명 확인 필요 |
+| 건축물대장 (건축HUB) | O | **PASS** | 358건 반환 (청운벽산빌리지 등), 76개 필드 확인 |
+| 에너지 (건축HUB) | O | **PASS** | 전기 57,873 kWh / 가스 477,322 kWh 반환 |
 | 카카오맵 | O | **PASS** | 좌표→주소, 키워드검색 정상 |
 | Google Vision OCR | O | **대기중** | 결제 계정 연결 필요 |
 
@@ -323,12 +326,13 @@ Vworld LT_C_SPBD (bd_mgt_sn + 폴리곤) → PNU = bd_mgt_sn[:19]
 ### 확인된 것
 - **Vworld 건물통합정보 정상 동작** — LT_C_SPBD 레이어, 반경 500m 내 건물 10건 반환. bd_mgt_sn(25자리), 폴리곤(MultiPolygon), 도로명주소 확인
 - **실거래가 API 정상 동작** — 법정동코드+계약년월로 매매 데이터 조회 가능 (거래금액, 면적, 아파트명, 층, 건축년도 등 32개 필드)
+- **건축물대장 API 정상 동작** — PNU 기반 조회로 358건 반환. mgmBldrgstPk, 건물명, 용도, 면적, 사용승인일, 동명칭 등 76개 필드 확인. 집합건물(아파트) 1:N 매칭 문제 확인 (동 이름 텍스트 매칭 필요)
+- **에너지 API 정상 동작** — 전기 57,873 kWh, 가스 477,322 kWh 반환. ESG 탄소배출량 계산 가능 (27.47 kg CO₂)
 - **카카오맵 API 정상 동작** — 좌표→주소 변환, 행정구역코드 반환, POI 키워드 검색
 - **PNU 기반 연계 구조 확인** — BD_MGT_SN은 공통키가 아님. PNU = bd_mgt_sn[:19]로 추출, 분해하여 각 API 파라미터로 변환
 - **PNU 파싱 로직 구현 완료** — 19자리 → 시군구코드/법정동코드/번/지 자동 분해
 
 ### 아직 안 되는 것
-- 건축물대장/에너지 — 건축HUB API 엔드포인트 오퍼레이션명 미확인 (참고문서 필요)
 - Google OCR — GCP 결제 계정 미연결
 
 ### 주의사항
@@ -338,6 +342,8 @@ Vworld LT_C_SPBD (bd_mgt_sn + 폴리곤) → PNU = bd_mgt_sn[:19]
 - Vworld PNU: 별도 필드 없음, `bd_mgt_sn[:19]`로 추출
 - 일일 1,000회 제한 → 캐싱 레이어 필수
 - 카카오맵은 제품 설정에서 "카카오맵" 서비스 ON 필요 (초기 비활성화 상태)
+- data.go.kr HTTPS API 호출 시 Python urllib의 `Accept-Encoding: identity` 헤더 제거 필요 (빈 응답 원인)
+- 에너지 API 필수 파라미터: `platGbCd`(대지구분코드), 파라미터명 `useYm`(`useYmd` 아님)
 
 ---
 

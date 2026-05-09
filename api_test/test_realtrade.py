@@ -40,6 +40,8 @@ def _fetch_xml(url: str, params: dict) -> ET.Element | None:
 
     try:
         req = urllib.request.Request(full_url)
+        req.add_unredirected_header("Accept-Encoding", "")
+        req.add_header("Accept", "*/*")
         with urllib.request.urlopen(req, timeout=15) as resp:
             raw = resp.read().decode("utf-8")
 
