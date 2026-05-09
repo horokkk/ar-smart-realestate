@@ -29,14 +29,14 @@ from config import (
 def test_get_buildings(lon: float = DEFAULT_LON, lat: float = DEFAULT_LAT,
                        buffer: int = 500):
     """
-    GIS건물통합정보 조회 — 특정 좌표 반경 내 건물 폴리곤
+    건물통합정보 조회 — 특정 좌표 반경 내 건물 폴리곤
 
     Vworld 2D 데이터 API 사용
-    레이어: LT_C_AISRESC (GIS건물통합정보)
-    ※ 레이어명이 다를 경우 아래 대안도 테스트:
-       - LT_C_AISRESC
-       - LT_C_UISRESC
-       - LT_C_SPBD (공간정보 건물)
+    레이어: LT_C_SPBD (도로명주소 건물)
+
+    주요 속성: bd_mgt_sn(건물관리번호 25자리), buld_nm(건물명),
+              gro_flo_co(지상층수), rd_nm(도로명), buld_no(건물번호)
+    PNU는 별도 필드 없음 → bd_mgt_sn[:19]로 추출
     """
     print_header("Vworld GIS건물통합정보 API 테스트")
 
@@ -46,9 +46,7 @@ def test_get_buildings(lon: float = DEFAULT_LON, lat: float = DEFAULT_LAT,
     # ─── 메인 요청: GIS건물통합정보 ─────────────────────
     # 여러 레이어명 후보를 시도
     layer_candidates = [
-        "LT_C_AISRESC",     # GIS건물통합정보 (가장 유력)
-        "LT_C_SPBD",        # 공간정보 건물
-        "LT_C_UISRESC",     # 도시지역건물정보
+        "LT_C_SPBD",        # 도로명주소 건물 (건물통합정보)
     ]
 
     result = None
@@ -120,30 +118,34 @@ def test_get_buildings(lon: float = DEFAULT_LON, lat: float = DEFAULT_LAT,
     print(f"\n  --- 첫 번째 건물 상세 ---")
     print(f"  속성 필드: {list(props.keys())}")
 
-    # BD_MGT_SN 확인 (여러 필드명 후보)
-    bd_mgt_sn = (props.get("BD_MGT_SN")
-                 or props.get("bd_mgt_sn")
-                 or props.get("BDMGT_SN")
-                 or props.get("bdMgtSn")
-                 or "")
-    print_check("BD_MGT_SN 포함", bool(bd_mgt_sn),
+    # BD_MGT_SN 확인
+    bd_mgt_sn = props.get("bd_mgt_sn") or props.get("BD_MGT_SN") or ""
+    print_check("bd_mgt_sn 포함", bool(bd_mgt_sn),
                 f"값: {bd_mgt_sn}" if bd_mgt_sn else "필드 없음")
     if bd_mgt_sn:
-        print_check("BD_MGT_SN 25자리", len(bd_mgt_sn) == 25,
+        print_check("bd_mgt_sn 25자리", len(bd_mgt_sn) == 25,
                      f"{len(bd_mgt_sn)}자리")
 
-    # PNU 확인
-    pnu = props.get("PNU") or props.get("pnu") or ""
-    print_check("PNU 포함", bool(pnu),
-                f"값: {pnu}" if pnu else "필드 없음")
+    # PNU = bd_mgt_sn 앞 19자리
+    pnu = bd_mgt_sn[:19] if len(bd_mgt_sn) >= 19 else ""
+    print_check("PNU 추출 (bd_mgt_sn[:19])", bool(pnu),
+                f"값: {pnu}" if pnu else "bd_mgt_sn 부족")
     if pnu:
         print_check("PNU 19자리", len(pnu) == 19,
                      f"{len(pnu)}자리")
 
     # 건물명
-    bld_nm = (props.get("BLD_NM") or props.get("buld_nm")
-              or props.get("BULD_NM") or "")
+    bld_nm = props.get("buld_nm") or props.get("BLD_NM") or ""
     print(f"  건물명: {bld_nm or '(없음)'}")
+
+    # 추가 정보
+    gro_flo = props.get("gro_flo_co") or ""
+    if gro_flo:
+        print(f"  지상층수: {gro_flo}")
+    rd_nm = props.get("rd_nm") or ""
+    buld_no = props.get("buld_no") or ""
+    if rd_nm:
+        print(f"  도로명: {rd_nm} {buld_no}")
 
     # geometry 타입
     geom_type = geom.get("type", "")
@@ -174,43 +176,11 @@ def test_get_buildings(lon: float = DEFAULT_LON, lat: float = DEFAULT_LAT,
     return result
 
 
-def test_layer_list():
-    """Vworld에서 사용 가능한 레이어 목록 조회"""
-    print_header("Vworld 레이어 목록 조회")
-
-    if not check_api_key("Vworld", VWORLD_API_KEY):
-        return None
-
-    params = {
-        "key": VWORLD_API_KEY,
-        "service": "data",
-        "request": "GetLayerList",
-        "category": "건물",
-        "format": "json",
-    }
-
-    url = "http://api.vworld.kr/req/data?" + urllib.parse.urlencode(params)
-    print(f"  요청 URL: {url[:120]}...")
-
-    try:
-        req = urllib.request.Request(url)
-        req.add_header("Referer", "http://localhost")
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        save_sample("vworld_layer_list.json", data)
-        print(f"  응답: {json.dumps(data, ensure_ascii=False)[:500]}")
-        return data
-    except Exception as e:
-        print(f"  오류: {e}")
-        return None
-
-
 if __name__ == "__main__":
-    print("Vworld GIS건물통합정보 API 테스트 시작\n")
+    print("Vworld 건물통합정보 API 테스트 시작\n")
     print(f"테스트 좌표: ({DEFAULT_LON}, {DEFAULT_LAT}) — 서울시청 부근")
     print(f"검색 반경: 500m")
 
-    test_layer_list()
     test_get_buildings()
 
     print("\n\n테스트 완료. data_samples/ 폴더에서 응답 JSON을 확인하세요.")
