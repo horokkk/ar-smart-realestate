@@ -205,7 +205,7 @@ python test_pipeline.py
 
 ### BD_MGT_SN은 만능 공통키가 아니다
 
-초기 가설 (BD_MGT_SN으로 모든 API 연결) 은 **틀렸다**.
+초기 가설 (BD_MGT_SN으로 모든 API 연결) 은 **잘못됐다**.
 
 실제 연계는 **PNU(필지고유번호)** 를 분해하여 각 API에 맞는 파라미터로 변환:
 
