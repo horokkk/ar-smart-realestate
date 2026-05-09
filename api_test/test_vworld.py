@@ -75,6 +75,7 @@ def test_get_buildings(lon: float = DEFAULT_LON, lat: float = DEFAULT_LAT,
 
         try:
             req = urllib.request.Request(url)
+            req.add_header("Referer", "http://localhost")
             with urllib.request.urlopen(req, timeout=15) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
 
@@ -193,6 +194,7 @@ def test_layer_list():
 
     try:
         req = urllib.request.Request(url)
+        req.add_header("Referer", "http://localhost")
         with urllib.request.urlopen(req, timeout=15) as resp:
             data = json.loads(resp.read().decode("utf-8"))
         save_sample("vworld_layer_list.json", data)
